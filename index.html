@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hausfinanzierungs-Rechner — Bauspar vs. ETF vs. Anschlussdarlehen</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🏠 Hausfinanzierungs-Rechner</h1>
+    <p class="untertitel">
+      Wie finanziere ich die <strong>Restschuld</strong> nach Ablauf der Zinsbindung am besten —
+      <strong>Bausparvertrag</strong>, <strong>ETF-Sparplan</strong> oder ein einfaches
+      <strong>Anschlussdarlehen</strong>? Alle Werte sind editierbar.
+    </p>
+  </header>
+
+  <main>
+    <!-- ============ EINGABEN ============ -->
+    <form id="form" class="eingaben">
+      <details open>
+        <summary>Kauf &amp; Nebenkosten</summary>
+        <div class="grid">
+          <label>Kaufpreis (€) <i data-tip="Reiner Kaufpreis der Immobilie ohne Nebenkosten.">?</i>
+            <input type="number" id="kaufpreis" step="1000" min="0" /></label>
+          <label>Eigenkapital (€) <i data-tip="Dein Startkapital. Deckt zuerst die Nebenkosten, der Rest mindert das Darlehen.">?</i>
+            <input type="number" id="eigenkapital" step="1000" min="0" /></label>
+          <label>Grunderwerbsteuer (%) <i data-tip="Je Bundesland 3,5–6,5 %. Bayern/Sachsen 3,5 %, NRW/Brandenburg 6,5 %.">?</i>
+            <input type="number" id="grunderwerbPct" step="0.1" min="0" /></label>
+          <label>Notar (%) <i data-tip="Notarielle Beurkundung, üblich ca. 1,5 % des Kaufpreises.">?</i>
+            <input type="number" id="notarPct" step="0.1" min="0" /></label>
+          <label>Grundbuch (%) <i data-tip="Grundbucheintrag, üblich ca. 0,5 %.">?</i>
+            <input type="number" id="grundbuchPct" step="0.1" min="0" /></label>
+          <label>Maklerprovision (%) <i data-tip="Oft 3,57 % inkl. MwSt. für den Käufer; bei provisionsfreiem Kauf 0.">?</i>
+            <input type="number" id="maklerPct" step="0.01" min="0" /></label>
+        </div>
+        <p class="hinweis" id="nebenkostenHinweis"></p>
+      </details>
+
+      <details open>
+        <summary>Bankdarlehen (Phase 1 — Zinsbindung)</summary>
+        <div class="grid">
+          <label>Darlehen override (€) <i data-tip="0 = automatisch aus Kaufpreis + Nebenkosten − Eigenkapital. Sonst feste Darlehenssumme.">?</i>
+            <input type="number" id="darlehenOverride" step="1000" min="0" /></label>
+          <label>Sollzins (% p.a.) <i data-tip="Gebundener Nominalzins des Bankdarlehens während der Zinsbindung.">?</i>
+            <input type="number" id="sollzins" step="0.1" min="0" /></label>
+          <label>Anfangstilgung (% p.a.) <i data-tip="Anfänglicher Tilgungssatz. Monatsrate = Darlehen·(Sollzins+Tilgung)/12.">?</i>
+            <input type="number" id="tilgung" step="0.1" min="0" /></label>
+          <label>Zinsbindung (Jahre) <i data-tip="Dauer der Zinsfestschreibung (oft 5/10/15/20). Danach bleibt die Restschuld.">?</i>
+            <input type="number" id="zinsbindungJahre" step="1" min="1" /></label>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Betrachtung &amp; Seitenrate</summary>
+        <div class="grid">
+          <label>Betrachtungshorizont (Jahre) <i data-tip="Gesamtzeitraum der Bewertung, ≥ Zinsbindung. Am Ende wird das Nettovermögen verglichen.">?</i>
+            <input type="number" id="horizontJahre" step="1" min="1" /></label>
+          <label>Seitenrate (€/Monat) <i data-tip="Betrag, den du ZUSÄTZLICH zur Bankrate aufbringst. Fließt in Bauspar/ETF bzw. als Sondertilgung. Hält das Budget aller Strategien gleich.">?</i>
+            <input type="number" id="seitenrate" step="10" min="0" /></label>
+          <label>Inflation (% p.a.) <i data-tip="Zur Berechnung realer (kaufkraftbereinigter) Endwerte.">?</i>
+            <input type="number" id="inflation" step="0.1" /></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Anschlussfinanzierung (Phase 2 — unsicher)</summary>
+        <div class="grid">
+          <label>Erwarteter Anschlusszins (% p.a.) <i data-tip="Markt­zins für ein neues Darlehen NACH der Zinsbindung. Heute unbekannt — der zentrale Unsicherheitsfaktor.">?</i>
+            <input type="number" id="anschlusszins" step="0.1" min="0" /></label>
+          <label>Anschlusszins-Spanne (± %) <i data-tip="Für die Szenarien: pessimistisch = +Spanne, optimistisch = −Spanne.">?</i>
+            <input type="number" id="anschlusszinsSpanne" step="0.1" min="0" /></label>
+          <label>Anschlusszins-Streuung σ (%) <i data-tip="Standardabweichung des Anschlusszinses für die Monte-Carlo-Simulation.">?</i>
+            <input type="number" id="anschlusszinsSigma" step="0.1" min="0" /></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Bausparvertrag</summary>
+        <div class="grid">
+          <label>Bausparsumme (€) <i data-tip="Zielsumme. Sinnvoll ≈ erwartete Restschuld. Guthaben + Bauspardarlehen ergeben die Summe.">?</i>
+            <input type="number" id="bausparsumme" step="1000" min="0" /></label>
+          <label>Abschlussgebühr (% der Summe) <i data-tip="Einmalig, meist 1,0–1,6 % der Bausparsumme. Wird vorab vom Guthaben abgezogen.">?</i>
+            <input type="number" id="bausparAbschlussgebuehr" step="0.1" min="0" /></label>
+          <label>Guthabenzins (% p.a.) <i data-tip="Verzinsung des Sparguthabens — meist niedrig (0–1 %).">?</i>
+            <input type="number" id="bausparGuthabenzins" step="0.1" min="0" /></label>
+          <label>Bauspardarlehenszins (% p.a.) <i data-tip="HEUTE festgeschriebener Zins für das spätere Darlehen — der eigentliche Vorteil als Zinsabsicherung.">?</i>
+            <input type="number" id="bausparDarlehenszins" step="0.1" min="0" /></label>
+          <label>Mindestsparguthaben (% der Summe) <i data-tip="Anteil, der angespart sein muss, bis das Darlehen zugeteilt wird (oft 40–50 %).">?</i>
+            <input type="number" id="bausparMindestsparguthaben" step="1" min="0" /></label>
+          <label>Kontoführungsgebühr (€/Jahr) <i data-tip="Jährliche Gebühr während Spar- und Darlehensphase.">?</i>
+            <input type="number" id="bausparKontofuehrung" step="1" min="0" /></label>
+          <label>Förderung (€/Jahr) <i data-tip="Wohnungsbauprämie, Arbeitnehmersparzulage oder Wohn-Riester — falls anspruchsberechtigt.">?</i>
+            <input type="number" id="bausparFoerderung" step="10" min="0" /></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>ETF-Sparplan</summary>
+        <div class="grid">
+          <label>Erwartete Rendite (% p.a.) <i data-tip="Langfristige Renditeerwartung breit gestreuter Aktien-ETFs, historisch ~6–8 % nominal.">?</i>
+            <input type="number" id="etfRendite" step="0.1" /></label>
+          <label>Rendite-Spanne (± %) <i data-tip="Für die Szenarien: optimistisch = +Spanne, pessimistisch = −Spanne.">?</i>
+            <input type="number" id="etfRenditeSpanne" step="0.1" min="0" /></label>
+          <label>Volatilität σ (% p.a.) <i data-tip="Schwankung der Jahresrendite für Monte-Carlo. Aktien-ETFs ~15–20 %.">?</i>
+            <input type="number" id="etfVolatilitaet" step="0.5" min="0" /></label>
+          <label>Abgeltungssteuer (%) <i data-tip="25 % + Solidaritätszuschlag = 26,375 % (ohne Kirchensteuer) auf Kursgewinne beim Verkauf.">?</i>
+            <input type="number" id="abgeltungssteuer" step="0.001" min="0" /></label>
+          <label>Teilfreistellung (%) <i data-tip="Bei Aktien-ETFs sind 30 % der Gewinne steuerfrei.">?</i>
+            <input type="number" id="teilfreistellung" step="1" min="0" /></label>
+        </div>
+      </details>
+
+      <div class="aktionen">
+        <button type="button" id="berechnen" class="primary">Berechnen</button>
+        <button type="button" id="reset">Standardwerte</button>
+        <label class="mc-anzahl">Monte-Carlo-Läufe
+          <input type="number" id="mcLaeufe" value="3000" step="500" min="200" max="50000" /></label>
+      </div>
+    </form>
+
+    <!-- ============ ERGEBNISSE ============ -->
+    <section id="ergebnisse" class="ergebnisse" hidden>
+      <div id="empfehlung" class="empfehlung"></div>
+
+      <h2>Nettovermögen nach <span id="horizontLabel"></span> Jahren</h2>
+      <p class="erklaerung">
+        Nettovermögen = Anlagevermögen − Restschuld am Horizont. Alle Strategien tragen dasselbe
+        Monatsbudget (Bankrate + Seitenrate); wer weniger Zinsen zahlt bzw. mehr Rendite erzielt, steht besser da.
+      </p>
+      <div id="karten" class="karten"></div>
+
+      <h2>Szenarien</h2>
+      <div class="tabelle-wrap"><table id="szenarioTabelle"></table></div>
+
+      <h2>Verläufe</h2>
+      <div class="charts">
+        <div class="chartbox"><h3>Restschuld (Bankdarlehen, Phase 1)</h3><canvas id="chartRestschuld"></canvas></div>
+        <div class="chartbox"><h3>Strategievergleich (erwartetes Szenario)</h3><canvas id="chartVergleich"></canvas></div>
+      </div>
+
+      <h2>Pro &amp; Contra</h2>
+      <div id="procontra" class="procontra"></div>
+
+      <!-- Monte-Carlo -->
+      <h2>Risikoanalyse — Monte-Carlo</h2>
+      <div class="tabs">
+        <button class="tab aktiv" data-tab="mc">Verteilung</button>
+        <button class="tab" data-tab="hilfe">Wie ist das zu lesen?</button>
+      </div>
+      <div class="tabinhalt" data-tabinhalt="mc">
+        <p id="mcHeadline" class="mc-headline"></p>
+        <div class="charts">
+          <div class="chartbox"><h3>Verteilung des Nettovermögens</h3><canvas id="chartMC"></canvas></div>
+          <div class="chartbox"><h3>Perzentilbänder (5 % – 95 %)</h3><canvas id="chartMCBand"></canvas></div>
+        </div>
+        <div class="tabelle-wrap"><table id="mcTabelle"></table></div>
+      </div>
+      <div class="tabinhalt" data-tabinhalt="hilfe" hidden>
+        <p>Die Simulation würfelt tausende Zukünfte aus: Der Anschlusszins schwankt normalverteilt um
+        deinen Erwartungswert (Streuung σ), die ETF-Rendite ebenfalls (Volatilität σ). Für jede gewürfelte
+        Zukunft wird das Nettovermögen aller drei Strategien berechnet.</p>
+        <ul>
+          <li><strong>Median</strong>: typischer Ausgang (50 % besser, 50 % schlechter).</li>
+          <li><strong>5. Perzentil</strong>: Worst-Case-Bereich — nur 5 % der Fälle sind schlechter. Maß für das Risiko.</li>
+          <li><strong>Gewinnwahrscheinlichkeit</strong>: Anteil der Zukünfte, in denen ETF besser abschneidet als der Bausparvertrag.</li>
+        </ul>
+        <p>Faustregel: Der Bausparvertrag hat eine <em>schmale</em> Verteilung (planbar), der ETF eine
+        <em>breite</em> (höherer Median, aber tieferer Worst-Case).</p>
+      </div>
+
+      <p class="disclaimer">
+        ⚠️ Vereinfachtes Modell zur Orientierung, keine Finanz- oder Steuerberatung. Annahmen u.a.:
+        nominale Monatsverzinsung, Steuer auf ETF-Gewinne nur beim Verkauf (Vorabpauschale vernachlässigt),
+        Zuteilung des Bausparvertrags zum Ende der Zinsbindung. Details siehe README.
+      </p>
+    </section>
+  </main>
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

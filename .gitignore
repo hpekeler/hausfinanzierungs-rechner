@@ -1,0 +1,5 @@
+# OS / editor
+.DS_Store
+*~
+# dependencies / scratch (none needed at runtime)
+node_modules/
