@@ -11,26 +11,48 @@ Alle Parameter sind Eingabefelder. Ergebnis: Nettovermögen nach *N* Jahren je
 Strategie, Szenarien (pessimistisch/erwartet/optimistisch), eine
 Monte-Carlo-Risikoanalyse, Pro/Contra-Listen und eine Empfehlung.
 
-## Starten
+## Nutzung — einfach im Browser
 
-Kein Build nötig. Wegen ES-Modulen muss die Seite über einen Webserver laufen
-(nicht per `file://` öffnen):
+Der Rechner läuft als statische Web-Seite über **GitHub Pages**, vollständig im
+Browser. Keine Installation, kein Server, keine Anmeldung — von jedem Gerät
+(Desktop oder Handy) aus nutzbar:
+
+### ➡️ https://hpekeler.github.io/hausfinanzierungs-rechner/
+
+Link öffnen, Werte eingeben, **„Berechnen"**. Die Eingaben werden lokal im
+Browser (`localStorage`) gespeichert und verlassen das Gerät nicht — die gesamte
+Berechnung passiert auf deinem Rechner, es werden keine Daten übertragen.
+
+## Veröffentlichen & Aktualisieren
+
+Die Seite wird direkt aus dem `main`-Branch dieses Repos ausgeliefert. **Jeder
+Push aktualisiert die Live-Seite automatisch** (GitHub Pages baut neu, meist
+innerhalb einer Minute) — ein separater Deploy ist nicht nötig:
 
 ```bash
-cd /home/pekeler/Desktop/Private/Geldanlage
-python3 -m http.server 8000
-# Browser: http://localhost:8000
+git add -A
+git commit -m "Beschreibung der Änderung"
+git push          # → https://hpekeler.github.io/hausfinanzierungs-rechner/ baut automatisch neu
 ```
 
-Chart.js liegt lokal unter `vendor/` – die Seite funktioniert **vollständig
-offline**.
+Pages ist eingestellt auf **Settings → Pages → Source: Deploy from a branch →
+Branch: `main` / `(root)`**. Die Datei `.nojekyll` sorgt dafür, dass die Dateien
+unverändert ausgeliefert werden.
 
-## Tests
+## Entwicklung & Tests
 
-Die Finanzmathematik (`finance.js`) ist reine, DOM-freie Logik und getestet:
+Die Finanzmathematik (`finance.js`) ist reine, DOM-freie Logik und mit Node
+getestet (kein Server nötig):
 
 ```bash
 node --test        # 13 Tests, u.a. Annuität, Restschuld, Bauspar, ETF-Steuer, Szenarien, Monte-Carlo
+```
+
+Zum **lokalen Vorschauen** der Seite vor dem Push einen beliebigen statischen
+Server verwenden (ES-Module funktionieren nicht über `file://`), z. B. mit Node:
+
+```bash
+npx serve .        # oder: die „Live Server"-Erweiterung in VS Code
 ```
 
 ## Dateien
@@ -42,8 +64,9 @@ node --test        # 13 Tests, u.a. Annuität, Restschuld, Bauspar, ETF-Steuer, 
 | `finance.js` | **Reine Finanzmathematik** (ES-Modul, im Browser und in Node nutzbar) |
 | `charts.js` | Chart.js-Diagramme |
 | `app.js` | Verbindet Formular, Berechnung und Darstellung; speichert Eingaben in `localStorage` |
-| `vendor/chart.umd.min.js` | Chart.js 4.4 (lokal, offline) |
-| `test/finance.test.mjs` | Unit-Tests |
+| `vendor/chart.umd.min.js` | Chart.js 4.4 (lokal eingebunden, funktioniert offline) |
+| `test/finance.test.mjs` | Unit-Tests (`node --test`) |
+| `.nojekyll` | Schaltet die Jekyll-Verarbeitung von GitHub Pages ab (Dateien unverändert ausliefern) |
 
 ## Rechenmodell (Kurzfassung)
 

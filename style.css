@@ -195,3 +195,14 @@ canvas { max-height: 320px; }
 .mc-headline { font-size: 1.1rem; background: var(--panel); border-radius: 10px; padding: .8rem 1rem; border: 1px solid var(--line); }
 
 .disclaimer { color: var(--muted); font-size: .8rem; margin-top: 2rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+
+.seitenfuss {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  color: var(--muted);
+  font-size: .85rem;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+.seitenfuss a { color: var(--accent); }
