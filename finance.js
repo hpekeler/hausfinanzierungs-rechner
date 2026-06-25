@@ -36,7 +36,8 @@ export function tilgungsplan(darlehen, sollzinsPct, monatsrate, monate, sonderti
   let balance = darlehen;
   let gezahlteZinsen = 0;
   let gezahlteTilgung = 0;
-  const verlauf = [{ jahr: 0, restschuld: balance }];
+  const verlauf = [{ jahr: 0, restschuld: balance, zins: 0, tilgung: 0, sondertilgung: 0, rate: 0 }];
+  let jZins = 0, jTilgung = 0, jSonder = 0, jRate = 0; // Aggregate je Jahr
 
   for (let m = 1; m <= monate && balance > 1e-6; m++) {
     const zins = balance * r;
@@ -46,15 +47,24 @@ export function tilgungsplan(darlehen, sollzinsPct, monatsrate, monate, sonderti
     balance -= tilgung;
     gezahlteZinsen += zins;
     gezahlteTilgung += tilgung;
+    jZins += zins;
+    jTilgung += tilgung;
+    jRate += zins + tilgung; // tatsächlich gezahlte Monatsrate (letzte Rate ggf. kleiner)
 
     if (m % 12 === 0 && sondertilgungJahr > 0 && balance > 0) {
       const st = Math.min(sondertilgungJahr, balance);
       balance -= st;
       gezahlteTilgung += st;
+      jSonder += st;
     }
-    if (m % 12 === 0) verlauf.push({ jahr: m / 12, restschuld: balance });
+    if (m % 12 === 0) {
+      verlauf.push({ jahr: m / 12, restschuld: balance, zins: jZins, tilgung: jTilgung, sondertilgung: jSonder, rate: jRate });
+      jZins = 0; jTilgung = 0; jSonder = 0; jRate = 0;
+    }
   }
-  if (monate % 12 !== 0) verlauf.push({ jahr: monate / 12, restschuld: balance });
+  if (monate % 12 !== 0) {
+    verlauf.push({ jahr: monate / 12, restschuld: balance, zins: jZins, tilgung: jTilgung, sondertilgung: jSonder, rate: jRate });
+  }
 
   return { restschuld: balance, gezahlteZinsen, gezahlteTilgung, verlauf };
 }
@@ -159,12 +169,17 @@ export function phase2({ schulden, budget, monate, anlageStart = 0, anlageZinsPc
     .sort((a, b) => b.r - a.r); // teuerste zuerst
   const ra = Math.pow(1 + anlageZinsPct / 100, 1 / 12) - 1;
   let anlage = anlageStart;
-  const verlauf = [];
+  const verlauf = [{ jahr: 0, schuld: debts.reduce((s, d) => s + d.bal, 0), anlage, zins: 0, tilgung: 0 }];
+  let jZins = 0, jTilgung = 0; // Aggregate je Jahr
 
   for (let m = 1; m <= monate; m++) {
     anlage *= 1 + ra;
     // Zinsen auf alle Schulden
-    for (const d of debts) d.bal += d.bal * d.r;
+    for (const d of debts) {
+      const z = d.bal * d.r;
+      d.bal += z;
+      jZins += z;
+    }
     let rest = budget;
     // teuerste Schuld zuerst tilgen
     for (const d of debts) {
@@ -172,10 +187,12 @@ export function phase2({ schulden, budget, monate, anlageStart = 0, anlageZinsPc
       const zahlung = Math.min(rest, d.bal);
       d.bal -= zahlung;
       rest -= zahlung;
+      jTilgung += zahlung;
     }
     if (rest > 0) anlage += rest; // Budgetüberschuss anlegen
     if (m % 12 === 0) {
-      verlauf.push({ jahr: m / 12, schuld: debts.reduce((s, d) => s + d.bal, 0), anlage });
+      verlauf.push({ jahr: m / 12, schuld: debts.reduce((s, d) => s + d.bal, 0), anlage, zins: jZins, tilgung: jTilgung });
+      jZins = 0; jTilgung = 0;
     }
   }
   const restschuldGes = debts.reduce((s, d) => s + d.bal, 0);

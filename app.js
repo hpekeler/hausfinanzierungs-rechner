@@ -208,6 +208,67 @@ function rendereMonteCarlo(mc) {
 }
 
 // ---------------------------------------------------------------------------
+// Render: Monatliche Belastung & Tilgungsplan (Phase 1, Bankdarlehen)
+// ---------------------------------------------------------------------------
+function rendereTilgungsplan(inp, basis) {
+  // Monatliche Belastung auf einen Blick
+  $('belastung').innerHTML =
+    `<div class="zeile"><span>Bankrate (Annuität, Phase 1)</span><span>${eur(basis.annuitaet)} / Monat</span></div>` +
+    `<div class="zeile"><span>Seitenrate (fließt in Bauspar / ETF / Sondertilgung)</span><span>${eur(inp.seitenrate)} / Monat</span></div>` +
+    `<div class="zeile gesamt"><span>Gesamtbudget (gleich für alle Strategien)</span><span>${eur(basis.monatsbudget)} / Monat</span></div>` +
+    `<div class="zeile"><span>Darlehenssumme</span><span>${eur(basis.darlehen)}</span></div>` +
+    `<div class="zeile"><span>Restschuld am Ende der Zinsbindung (${inp.zinsbindungJahre} J.)</span><span>${eur(basis.restschuldBank)}</span></div>`;
+
+  // Jahr-für-Jahr-Tilgungsplan des Bankdarlehens (nur Annuität, ohne Seitenrate)
+  const v = basis.verlaufBank;
+  const kopf = `<thead><tr><th>Jahr</th><th>Rate / Monat</th><th>Zinsen (Jahr)</th><th>Tilgung (Jahr)</th><th>Restschuld (Jahresende)</th></tr></thead>`;
+  const zeilen = v.slice(1).map((p) => {
+    const breakpoint = Math.abs(p.jahr - inp.zinsbindungJahre) < 1e-9;
+    const rateMonat = p.rate > 0.5 ? eur(p.rate / 12) : '—';
+    return `<tr class="${breakpoint ? 'breakpoint' : ''}">
+      <td>${p.jahr}${breakpoint ? ' 🔻' : ''}</td>
+      <td>${rateMonat}</td>
+      <td>${eur(p.zins)}</td>
+      <td>${eur(p.tilgung)}</td>
+      <td>${eur(p.restschuld)}</td>
+    </tr>`;
+  }).join('');
+  $('tilgungsplanTabelle').innerHTML = kopf + `<tbody>${zeilen}</tbody>`;
+  $('tilgungsplanHinweis').innerHTML =
+    `🔻 <strong>Break-Point: Ende der Zinsbindung nach ${inp.zinsbindungJahre} Jahren.</strong> ` +
+    `Die verbleibende Restschuld von <strong>${eur(basis.restschuldBank)}</strong> muss jetzt anschlussfinanziert werden — ` +
+    `wie das je nach Strategie weitergeht, zeigt die Tabelle unten.`;
+}
+
+// ---------------------------------------------------------------------------
+// Render: Phase 2 (nach Zinsbindung) — Restschuld & Anlagevermögen je Jahr
+// ---------------------------------------------------------------------------
+function renderePhase2Tabelle(inp, sz) {
+  const e = sz.erwartet;
+  const basisVerlauf = e.basis.verlauf; // enthält jahr 0 als Startpunkt
+  const kopf =
+    `<thead>
+      <tr><th rowspan="2">Jahr</th>` +
+      REIHEN.map((k) => `<th colspan="3">${LABELS[k]}</th>`).join('') +
+    `</tr>
+      <tr>` +
+      REIHEN.map(() => `<th>Restschuld</th><th>Anlage</th><th>Netto</th>`).join('') +
+    `</tr></thead>`;
+
+  const zeilen = basisVerlauf.map((_, i) => {
+    if (i === 0) return ''; // Startpunkt (= Break-Point) überspringen, steht schon oben
+    const absJahr = inp.zinsbindungJahre + basisVerlauf[i].jahr;
+    const tds = REIHEN.map((k) => {
+      const p = e[k].verlauf[i];
+      const netto = p.anlage - p.schuld;
+      return `<td>${eur(p.schuld)}</td><td>${eur(p.anlage)}</td><td class="${netto >= 0 ? 'pos' : 'neg'}">${eur(netto)}</td>`;
+    }).join('');
+    return `<tr><td>${absJahr}</td>${tds}</tr>`;
+  }).join('');
+  $('phase2Tabelle').innerHTML = kopf + `<tbody>${zeilen}</tbody>`;
+}
+
+// ---------------------------------------------------------------------------
 // Hauptberechnung
 // ---------------------------------------------------------------------------
 function berechnen() {
@@ -225,6 +286,8 @@ function berechnen() {
 
   $('horizontLabel').textContent = inp.horizontJahre;
   rendereKarten(sz);
+  rendereTilgungsplan(inp, basis);
+  renderePhase2Tabelle(inp, sz);
   rendereSzenarioTabelle(sz);
   rendereEmpfehlung(sz, mc, inp);
   rendereProContra(sz, mc);
