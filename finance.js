@@ -122,7 +122,7 @@ export function bausparStatusBei(jahre, params) {
   const guthaben = Math.max(0, sp.guthaben);
   const bauspardarlehen = Math.max(0, params.bausparsumme - guthaben);
   const zugeteilt = sp.zuteilungMonat !== null && sp.zuteilungMonat <= monate;
-  return { guthaben, bauspardarlehen, zugeteilt, zuteilungMonat: sp.zuteilungMonat, verlauf: sp.verlauf };
+  return { guthaben, bauspardarlehen, zugeteilt, zuteilungMonat: sp.zuteilungMonat, eingezahlt: sp.eingezahlt, verlauf: sp.verlauf };
 }
 
 // ---------------------------------------------------------------------------
@@ -245,12 +245,26 @@ export function vergleicheStrategien(inp, basis, { anschlusszins, etfRendite }) 
 
   // --- Basis: Anschlussdarlehen (Seitenrate floss als Sondertilgung) ---
   {
+    const sondertilgung = Math.max(0, basis.restschuldBank - basis.restschuldBankSonder);
     const p2 = phase2({
       schulden: [{ bal: basis.restschuldBankSonder, ratePct: anschlusszins }],
       budget, monate: phase2Monate, anlageZinsPct: anschlusszins,
     });
     const netto = p2.anlage - p2.restschuld;
-    out.basis = nettoErgebnis(netto, realFaktor, { restschuld: basis.restschuldBankSonder, verlauf: p2.verlauf });
+    out.basis = nettoErgebnis(netto, realFaktor, {
+      restschuld: basis.restschuldBankSonder, verlauf: p2.verlauf,
+      start: {
+        seitenrateZiel: 'zusätzliche Sondertilgung',
+        eingezahltSeite: inp.seitenrate * basis.phase1Monate,
+        bankRestschuld: basis.restschuldBank,        // ohne Seitenrate
+        anrechnung: sondertilgung,                   // durch Seitenrate extra getilgt
+        anrechnungLabel: 'davon per Seitenrate sondergetilgt',
+        zuRefinanzieren: basis.restschuldBankSonder, // Schuld am Phase-2-Start
+        festZins: 0,
+        marktZins: basis.restschuldBankSonder,
+        anlageStart: 0,
+      },
+    });
   }
 
   // --- ETF ---
@@ -268,6 +282,20 @@ export function vergleicheStrategien(inp, basis, { anschlusszins, etfRendite }) 
     const netto = p2.anlage - p2.restschuld;
     out.etf = nettoErgebnis(netto, realFaktor, {
       restschuld: basis.restschuldBank, etfNetto: etf.netto, etfSteuer: etf.steuer, verlauf: p2.verlauf,
+      start: {
+        seitenrateZiel: 'ETF-Sparplan',
+        eingezahltSeite: etf.eingezahlt,
+        etfBrutto: etf.brutto,
+        etfGewinn: etf.gewinn,
+        etfSteuer: etf.steuer,
+        bankRestschuld: basis.restschuldBank,
+        anrechnung: Math.min(etf.netto, basis.restschuldBank), // ETF-Netto, gegen Restschuld gerechnet
+        anrechnungLabel: 'davon mit ETF-Wert (netto) getilgt',
+        zuRefinanzieren: restNachETF,
+        festZins: 0,
+        marktZins: restNachETF,
+        anlageStart: startAnlage,
+      },
     });
   }
 
@@ -294,6 +322,20 @@ export function vergleicheStrategien(inp, basis, { anschlusszins, etfRendite }) 
     out.bauspar = nettoErgebnis(netto, realFaktor, {
       restschuld: basis.restschuldBank, guthaben: status.guthaben, bauspardarlehen: ausBauspar,
       luecke, zugeteilt: status.zugeteilt, zuteilungMonat: status.zuteilungMonat, verlauf: p2.verlauf,
+      start: {
+        seitenrateZiel: 'Bausparvertrag (Sparphase)',
+        eingezahltSeite: status.eingezahlt,
+        guthaben: status.guthaben,
+        bankRestschuld: basis.restschuldBank,
+        anrechnung: Math.min(status.guthaben, basis.restschuldBank), // Guthaben gegen Restschuld
+        anrechnungLabel: 'davon mit Bausparguthaben getilgt',
+        zuRefinanzieren: restNachGuthaben,
+        festZins: ausBauspar,    // zum heute festen Bauspar-Darlehenszins
+        marktZins: luecke,       // Rest zum Markt-Anschlusszins
+        bausparDarlehenszins: inp.bausparDarlehenszins,
+        zugeteilt: status.zugeteilt,
+        anlageStart: startAnlage,
+      },
     });
   }
 

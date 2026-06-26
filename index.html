@@ -115,8 +115,6 @@
       <div class="aktionen">
         <button type="button" id="berechnen" class="primary">Berechnen</button>
         <button type="button" id="reset">Standardwerte</button>
-        <label class="mc-anzahl">Monte-Carlo-Läufe
-          <input type="number" id="mcLaeufe" value="3000" step="500" min="200" max="50000" /></label>
       </div>
     </form>
 
@@ -143,50 +141,39 @@
       <div class="tabelle-wrap"><table id="tilgungsplanTabelle" class="tilgungsplan"></table></div>
       <p class="hinweis" id="tilgungsplanHinweis"></p>
 
-      <h3>Phase 2 — Anschlussfinanzierung der Restschuld (erwartetes Szenario)</h3>
+      <h2>Übergang Phase 1 → Phase 2 — wie entsteht die Restschuld?</h2>
       <p class="erklaerung">
-        Ab hier verfolgt jede Strategie das gleiche Monatsbudget weiter. <strong>Netto</strong> = Anlagevermögen − Restschuld.
+        Am Ende der Zinsbindung steht je Strategie eine <em>unterschiedliche</em> zu refinanzierende Restschuld —
+        obwohl die Bankrate überall gleich ist. Der Unterschied kommt allein daher, <strong>wohin die Seitenrate
+        geflossen ist</strong>. Diese Tabelle rechnet Schritt für Schritt vom Vertrag zur Restschuld (erwartetes Szenario).
       </p>
-      <div class="tabelle-wrap"><table id="phase2Tabelle" class="tilgungsplan"></table></div>
+      <div class="tabelle-wrap"><table id="uebergangTabelle" class="tilgungsplan uebergang"></table></div>
+      <p class="hinweis" id="uebergangHinweis"></p>
 
-      <h2>Szenarien</h2>
-      <div class="tabelle-wrap"><table id="szenarioTabelle"></table></div>
+      <h2>Phase 2 — Anschlussfinanzierung Jahr für Jahr</h2>
+      <p class="erklaerung">
+        Jede Strategie führt das gleiche Monatsbudget weiter. Pro Jahr siehst du, <strong>wohin das Geld geht</strong>:
+        in Zinsen, in den Schuldenabbau oder — sobald die Schuld getilgt ist — in die Anlage.
+        <strong>Netto</strong> = Anlagewert − Restschuld. (Aufklappen für die Details je Strategie.)
+      </p>
+      <div id="phase2Tabellen"></div>
 
       <h2>Verläufe</h2>
       <div class="charts">
-        <div class="chartbox"><h3>Restschuld (Bankdarlehen, Phase 1)</h3><canvas id="chartRestschuld"></canvas></div>
-        <div class="chartbox"><h3>Strategievergleich (erwartetes Szenario)</h3><canvas id="chartVergleich"></canvas></div>
+        <div class="chartbox"><h3>Phase 1 — Restschuld Bankdarlehen</h3><canvas id="chartRestschuld"></canvas></div>
+        <div class="chartbox"><h3>Nettovermögen am Horizont (erwartet)</h3><canvas id="chartVergleich"></canvas></div>
+      </div>
+      <p class="erklaerung">
+        Phase 2 — Nettovermögen (Anlage − Restschuld) je Strategie über die Zeit, eine Grafik pro Szenario:
+      </p>
+      <div class="charts">
+        <div class="chartbox"><h3>Pessimistisch (hoher Zins, schwache Rendite)</h3><canvas id="chartP2Pessimistisch"></canvas></div>
+        <div class="chartbox"><h3>Erwartet</h3><canvas id="chartP2Erwartet"></canvas></div>
+        <div class="chartbox"><h3>Optimistisch (niedriger Zins, starke Rendite)</h3><canvas id="chartP2Optimistisch"></canvas></div>
       </div>
 
       <h2>Pro &amp; Contra</h2>
       <div id="procontra" class="procontra"></div>
-
-      <!-- Monte-Carlo -->
-      <h2>Risikoanalyse — Monte-Carlo</h2>
-      <div class="tabs">
-        <button class="tab aktiv" data-tab="mc">Verteilung</button>
-        <button class="tab" data-tab="hilfe">Wie ist das zu lesen?</button>
-      </div>
-      <div class="tabinhalt" data-tabinhalt="mc">
-        <p id="mcHeadline" class="mc-headline"></p>
-        <div class="charts">
-          <div class="chartbox"><h3>Verteilung des Nettovermögens</h3><canvas id="chartMC"></canvas></div>
-          <div class="chartbox"><h3>Perzentilbänder (5 % – 95 %)</h3><canvas id="chartMCBand"></canvas></div>
-        </div>
-        <div class="tabelle-wrap"><table id="mcTabelle"></table></div>
-      </div>
-      <div class="tabinhalt" data-tabinhalt="hilfe" hidden>
-        <p>Die Simulation würfelt tausende Zukünfte aus: Der Anschlusszins schwankt normalverteilt um
-        deinen Erwartungswert (Streuung σ), die ETF-Rendite ebenfalls (Volatilität σ). Für jede gewürfelte
-        Zukunft wird das Nettovermögen aller drei Strategien berechnet.</p>
-        <ul>
-          <li><strong>Median</strong>: typischer Ausgang (50 % besser, 50 % schlechter).</li>
-          <li><strong>5. Perzentil</strong>: Worst-Case-Bereich — nur 5 % der Fälle sind schlechter. Maß für das Risiko.</li>
-          <li><strong>Gewinnwahrscheinlichkeit</strong>: Anteil der Zukünfte, in denen ETF besser abschneidet als der Bausparvertrag.</li>
-        </ul>
-        <p>Faustregel: Der Bausparvertrag hat eine <em>schmale</em> Verteilung (planbar), der ETF eine
-        <em>breite</em> (höherer Median, aber tieferer Worst-Case).</p>
-      </div>
 
       <p class="disclaimer">
         ⚠️ Vereinfachtes Modell zur Orientierung, keine Finanz- oder Steuerberatung. Annahmen u.a.:

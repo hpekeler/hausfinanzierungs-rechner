@@ -1,8 +1,8 @@
 // app.js — verbindet Eingabeformular, Finanzmathematik und Darstellung.
 import {
-  STANDARDWERTE, kaufnebenkosten, basisRechnung, szenarien, monteCarlo,
+  STANDARDWERTE, kaufnebenkosten, basisRechnung, szenarien,
 } from './finance.js';
-import { restschuldChart, vergleichChart, monteCarloChart, perzentilBandChart } from './charts.js';
+import { restschuldChart, vergleichChart, phase2Chart } from './charts.js';
 
 const SPEICHER = 'hausrechner.eingaben.v1';
 const KEYS = Object.keys(STANDARDWERTE);
@@ -85,48 +85,32 @@ function rendereKarten(sz) {
 }
 
 // ---------------------------------------------------------------------------
-// Render: Szenariotabelle
-// ---------------------------------------------------------------------------
-function rendereSzenarioTabelle(sz) {
-  const namen = [['pessimistisch', 'Pessimistisch'], ['erwartet', 'Erwartet'], ['optimistisch', 'Optimistisch']];
-  const kopf = `<thead><tr><th>Szenario</th>${REIHEN.map((k) => `<th>${LABELS[k]}</th>`).join('')}</tr></thead>`;
-  const zeilen = namen.map(([key, label]) => {
-    const tds = REIHEN.map((k) => {
-      const v = sz[key][k].nettovermoegen;
-      return `<td class="${v >= 0 ? 'pos' : 'neg'}">${eur(v)}</td>`;
-    }).join('');
-    return `<tr><td>${label}</td>${tds}</tr>`;
-  }).join('');
-  $('szenarioTabelle').innerHTML = kopf + `<tbody>${zeilen}</tbody>`;
-}
-
-// ---------------------------------------------------------------------------
 // Render: Empfehlung
 // ---------------------------------------------------------------------------
-function rendereEmpfehlung(sz, mc, inp) {
-  const e = sz.erwartet;
+function rendereEmpfehlung(sz, inp) {
+  const e = sz.erwartet, p = sz.pessimistisch;
   const sieger = REIHEN.reduce((a, b) => (e[a].nettovermoegen >= e[b].nettovermoegen ? a : b));
+  const siegerPess = REIHEN.reduce((a, b) => (p[a].nettovermoegen >= p[b].nettovermoegen ? a : b));
   const vsBasis = (k) => e[k].nettovermoegen - e.basis.nettovermoegen;
 
   let txt = `Im <strong>erwarteten Szenario</strong> liefert der <strong>${LABELS[sieger]}</strong> das höchste Nettovermögen (${eur(e[sieger].nettovermoegen)}). `;
   if (sieger !== 'basis') txt += `Das sind ${eur(Math.abs(vsBasis(sieger)))} ${vsBasis(sieger) >= 0 ? 'mehr' : 'weniger'} als ein reines Anschlussdarlehen. `;
 
-  if (mc) {
-    txt += `<br><br>Im Risikoblick (Monte-Carlo): ETF schlägt den Bausparvertrag in <strong>${(mc.pEtfBesserBauspar * 100).toFixed(0)} %</strong> der Fälle. `;
-    txt += `Im Worst-Case (5. Perzentil) steht der ETF bei ${eur(mc.stats.etf.p05)}, der Bausparvertrag bei ${eur(mc.stats.bauspar.p05)}. `;
-    const sicher = mc.stats.bauspar.p05 > mc.stats.etf.p05;
-    txt += sicher
-      ? `Der Bausparvertrag ist im schlechten Fall <strong>robuster</strong> — sinnvoll bei geringer Risikotoleranz oder wenn du auf den Termin angewiesen bist.`
-      : `Der ETF ist hier sogar im Worst-Case nicht schlechter — die Zinsabsicherung des Bausparvertrags lohnt bei diesen Annahmen wenig.`;
-  }
+  txt += `<br><br>Im <strong>pessimistischen Szenario</strong> (Anschlusszins +${inp.anschlusszinsSpanne} %, ETF-Rendite −${inp.etfRenditeSpanne} %) ` +
+    `liegt der <strong>${LABELS[siegerPess]}</strong> vorn (${eur(p[siegerPess].nettovermoegen)}). `;
+  txt += siegerPess === 'bauspar'
+    ? `Der Bausparvertrag ist im schlechten Fall am <strong>robustesten</strong> — sinnvoll bei geringer Risikotoleranz oder wenn du auf den Termin angewiesen bist.`
+    : siegerPess === 'etf'
+    ? `Der ETF hält sich selbst im schlechten Fall gut — die Zinsabsicherung des Bausparvertrags lohnt bei diesen Annahmen wenig.`
+    : `Wenn es schlecht läuft, zahlt sich die schnelle Tilgung über das einfache Anschlussdarlehen aus.`;
   $('empfehlung').innerHTML = txt;
 }
 
 // ---------------------------------------------------------------------------
 // Render: Pro & Contra (statisch + dynamisch)
 // ---------------------------------------------------------------------------
-function rendereProContra(sz, mc) {
-  const e = sz.erwartet;
+function rendereProContra(sz) {
+  const e = sz.erwartet, p = sz.pessimistisch;
   const fmtVorteil = (k) => {
     const d = e[k].nettovermoegen - e.basis.nettovermoegen;
     return `${d >= 0 ? '+' : ''}${eur(d)} ggü. reinem Anschlussdarlehen (erwartet)`;
@@ -138,7 +122,7 @@ function rendereProContra(sz, mc) {
         'Zins für das Anschlussdarlehen wird HEUTE festgeschrieben → Schutz vor steigenden Zinsen.',
         'Planungssicherheit: feste Raten, kein Marktrisiko.',
         'Staatliche Förderung möglich (Wohnungsbauprämie, Wohn-Riester, Arbeitnehmersparzulage).',
-        `Worst-Case (5. Perz.): ${mc ? eur(mc.stats.bauspar.p05) : '—'} — meist die robusteste Strategie.`,
+        `Pessimistisches Szenario: ${eur(p.bauspar.nettovermoegen)} — meist die robusteste Strategie.`,
       ],
       contra: [
         'Niedriger Guthabenzins + Abschlussgebühr (1–1,6 %) → Renditeschwäche in der Sparphase.',
@@ -153,13 +137,13 @@ function rendereProContra(sz, mc) {
         'Höhere erwartete Rendite (~6–8 %) → im Mittel das größte Vermögen.',
         'Flexibel und jederzeit verfügbar (nicht zweckgebunden).',
         '30 % Teilfreistellung senkt die Steuer auf Aktien-ETF-Gewinne.',
-        mc ? `Gewinnt gegen Bauspar in ${(mc.pEtfBesserBauspar * 100).toFixed(0)} % der simulierten Zukünfte.` : '',
+        `Erwartetes Szenario: ${eur(e.etf.nettovermoegen)} — im Mittel meist vorn.`,
       ].filter(Boolean),
       contra: [
         'Kursrisiko: ausgerechnet zum Refinanzierungstermin kann der Markt unten stehen.',
         'Keine Zinsabsicherung — trifft zusätzlich ein hoher Anschlusszins, wirken zwei Risiken zusammen.',
         'Abgeltungssteuer auf Gewinne; Vorabpauschale in der Ansparzeit (hier vereinfacht).',
-        mc ? `Worst-Case (5. Perz.): ${eur(mc.stats.etf.p05)} — tiefer als beim Bausparvertrag.` : '',
+        `Pessimistisches Szenario: ${eur(p.etf.nettovermoegen)} — oft tiefer als beim Bausparvertrag.`,
       ].filter(Boolean),
     },
     basis: {
@@ -185,26 +169,6 @@ function rendereProContra(sz, mc) {
       <div class="label">✗ Contra</div><ul class="contra">${b.contra.map((x) => `<li>${x}</li>`).join('')}</ul>
     </div>`;
   }).join('');
-}
-
-// ---------------------------------------------------------------------------
-// Render: Monte-Carlo
-// ---------------------------------------------------------------------------
-function rendereMonteCarlo(mc) {
-  $('mcHeadline').innerHTML =
-    `Aus <strong>${mc.n.toLocaleString('de-DE')}</strong> simulierten Zukünften: ` +
-    `<strong>ETF schlägt Bausparvertrag in ${(mc.pEtfBesserBauspar * 100).toFixed(1)} % der Fälle</strong>, ` +
-    `das Anschlussdarlehen in ${(mc.pEtfBesserBasis * 100).toFixed(1)} %.`;
-
-  const kopf = `<thead><tr><th>Strategie</th><th>5. Perz.</th><th>Median</th><th>Mittelwert</th><th>95. Perz.</th></tr></thead>`;
-  const zeilen = REIHEN.map((k) => {
-    const s = mc.stats[k];
-    return `<tr><td>${LABELS[k]}</td><td>${eur(s.p05)}</td><td>${eur(s.median)}</td><td>${eur(s.mean)}</td><td>${eur(s.p95)}</td></tr>`;
-  }).join('');
-  $('mcTabelle').innerHTML = kopf + `<tbody>${zeilen}</tbody>`;
-
-  monteCarloChart(mc.roh);
-  perzentilBandChart(mc.stats);
 }
 
 // ---------------------------------------------------------------------------
@@ -236,36 +200,115 @@ function rendereTilgungsplan(inp, basis) {
   $('tilgungsplanTabelle').innerHTML = kopf + `<tbody>${zeilen}</tbody>`;
   $('tilgungsplanHinweis').innerHTML =
     `🔻 <strong>Break-Point: Ende der Zinsbindung nach ${inp.zinsbindungJahre} Jahren.</strong> ` +
-    `Die verbleibende Restschuld von <strong>${eur(basis.restschuldBank)}</strong> muss jetzt anschlussfinanziert werden — ` +
-    `wie das je nach Strategie weitergeht, zeigt die Tabelle unten.`;
+    `Nur durch die <strong>Annuität</strong> der Bank bleibt eine Restschuld von <strong>${eur(basis.restschuldBank)}</strong>. ` +
+    `Wie viel davon je Strategie tatsächlich noch übrig ist — je nachdem, was du nebenher mit der Seitenrate gemacht hast — ` +
+    `zeigt der Abschnitt „Übergang Phase 1 → Phase 2".`;
 }
 
 // ---------------------------------------------------------------------------
-// Render: Phase 2 (nach Zinsbindung) — Restschuld & Anlagevermögen je Jahr
+// Render: Übergang Phase 1 → Phase 2 — wie aus dem Vertrag die zu
+// refinanzierende Restschuld je Strategie entsteht (erwartetes Szenario).
 // ---------------------------------------------------------------------------
-function renderePhase2Tabelle(inp, sz) {
+function rendereUebergang(inp, basis, sz) {
   const e = sz.erwartet;
-  const basisVerlauf = e.basis.verlauf; // enthält jahr 0 als Startpunkt
-  const kopf =
-    `<thead>
-      <tr><th rowspan="2">Jahr</th>` +
-      REIHEN.map((k) => `<th colspan="3">${LABELS[k]}</th>`).join('') +
-    `</tr>
-      <tr>` +
-      REIHEN.map(() => `<th>Restschuld</th><th>Anlage</th><th>Netto</th>`).join('') +
-    `</tr></thead>`;
+  const starts = REIHEN.map((k) => e[k].start);
 
-  const zeilen = basisVerlauf.map((_, i) => {
-    if (i === 0) return ''; // Startpunkt (= Break-Point) überspringen, steht schon oben
-    const absJahr = inp.zinsbindungJahre + basisVerlauf[i].jahr;
-    const tds = REIHEN.map((k) => {
-      const p = e[k].verlauf[i];
+  // Hilfszeile: pro Strategie eine Zelle
+  const zeile = (label, werte, opts = {}) => {
+    const cls = opts.stark ? ' class="ueb-stark"' : '';
+    const tds = werte.map((w) => `<td>${w}</td>`).join('');
+    return `<tr${cls}><td>${label}</td>${tds}</tr>`;
+  };
+
+  const kopf = `<thead><tr><th>Schritt</th>${REIHEN.map((k) => `<th>${LABELS[k]}</th>`).join('')}</tr></thead>`;
+
+  const monate = basis.phase1Monate;
+  const rows = [
+    zeile(`Seitenrate (${eur(inp.seitenrate)}/Monat × ${monate} Monate) floss in`,
+      starts.map((s) => s.seitenrateZiel)),
+    zeile('Seitenrate eingezahlt gesamt',
+      starts.map((s) => eur(s.eingezahltSeite))),
+    zeile(`Bank-Restschuld nach ${inp.zinsbindungJahre} J. (nur Annuität)`,
+      starts.map((s) => eur(s.bankRestschuld))),
+    zeile('−  ' + 'angerechnet aus der Seitenrate',
+      starts.map((s) => `−${eur(s.anrechnung)}<br><span class="ueb-klein">${s.anrechnungLabel}</span>`)),
+    zeile('=  Zu refinanzierende Restschuld',
+      starts.map((s) => eur(s.zuRefinanzieren)), { stark: true }),
+    zeile('davon zum festen Bauspar-Darlehenszins',
+      starts.map((s) => s.festZins > 1 ? `${eur(s.festZins)} <span class="ueb-klein">(${s.bausparDarlehenszins} %)</span>` : '—')),
+    zeile('davon zum Markt-Anschlusszins',
+      starts.map((s) => s.marktZins > 1 ? `${eur(s.marktZins)} <span class="ueb-klein">(${inp.anschlusszins} %)</span>` : '—')),
+    zeile('zusätzliches Startguthaben angelegt',
+      starts.map((s) => s.anlageStart > 1 ? eur(s.anlageStart) : '—')),
+  ];
+
+  $('uebergangTabelle').innerHTML = kopf + `<tbody>${rows.join('')}</tbody>`;
+  $('uebergangHinweis').innerHTML =
+    `Alle drei Strategien zahlen während der Zinsbindung dieselbe Bankrate — die senkt das Darlehen auf ${eur(basis.restschuldBank)}. ` +
+    `Unterschiede entstehen nur dadurch, <strong>wohin die Seitenrate fließt</strong>: ` +
+    `Beim <strong>Anschlussdarlehen</strong> tilgt sie direkt mit (niedrigere Restschuld). ` +
+    `Beim <strong>Bausparvertrag</strong> wächst ein Guthaben an, das die Restschuld mindert; der Rest wird zum heute festen Bauspar-Zins finanziert. ` +
+    `Beim <strong>ETF</strong> wird das (versteuerte) Depot gegen die Restschuld gerechnet. ` +
+    `Übrig bleibt die <strong>zu refinanzierende Restschuld</strong> — der Startpunkt für Phase 2 (erwartetes Szenario).`;
+}
+
+// ---------------------------------------------------------------------------
+// Render: Phase 2 — je Strategie eine eigene Tabelle (erwartetes Szenario).
+// Jahr für Jahr: konstante Monatsrate, wohin sie fließt (Zinsen / Schuldenabbau
+// / Anlage), und die resultierenden Bestände (Restschuld, Anlage, Netto).
+// ---------------------------------------------------------------------------
+function renderePhase2Tabellen(inp, basis, sz) {
+  const e = sz.erwartet;
+  const budgetJahr = basis.monatsbudget * 12;
+
+  const bloecke = REIHEN.map((k) => {
+    const v = e[k].verlauf;
+    const start = e[k].start;
+    const kopf =
+      `<thead><tr>` +
+      `<th>Jahr</th><th>Monatsrate</th><th>→ Zinsen</th><th>→ Schuldenabbau</th><th>→ in Anlage</th>` +
+      `<th>Restschuld</th><th>Anlagewert</th><th>Netto</th>` +
+      `</tr></thead>`;
+
+    const zeilen = v.map((p, i) => {
+      if (i === 0) {
+        const netto0 = p.anlage - p.schuld;
+        return `<tr class="breakpoint"><td>${inp.zinsbindungJahre} 🔻</td><td>Start</td><td>—</td><td>—</td><td>—</td>` +
+          `<td>${eur(p.schuld)}</td><td>${eur(p.anlage)}</td><td class="${netto0 >= 0 ? 'pos' : 'neg'}">${eur(netto0)}</td></tr>`;
+      }
+      const vor = v[i - 1];
+      const schuldAbbau = vor.schuld - p.schuld;     // tatsächlicher Schuldenrückgang
+      const inAnlage = Math.max(0, budgetJahr - p.tilgung); // Budgetüberschuss → Anlage
       const netto = p.anlage - p.schuld;
-      return `<td>${eur(p.schuld)}</td><td>${eur(p.anlage)}</td><td class="${netto >= 0 ? 'pos' : 'neg'}">${eur(netto)}</td>`;
+      return `<tr>
+        <td>${inp.zinsbindungJahre + p.jahr}</td>
+        <td>${eur(basis.monatsbudget)}</td>
+        <td>${eur(p.zins)}</td>
+        <td>${eur(schuldAbbau)}</td>
+        <td>${eur(inAnlage)}</td>
+        <td>${eur(p.schuld)}</td>
+        <td>${eur(p.anlage)}</td>
+        <td class="${netto >= 0 ? 'pos' : 'neg'}">${eur(netto)}</td>
+      </tr>`;
     }).join('');
-    return `<tr><td>${absJahr}</td>${tds}</tr>`;
+
+    const offen = k === REIHEN.reduce((a, b) => (e[a].nettovermoegen >= e[b].nettovermoegen ? a : b));
+    return `<details class="phase2-block" ${offen ? 'open' : ''}>
+      <summary><span class="dot ${k}"></span>${LABELS[k]} — Start ${eur(start.zuRefinanzieren)} Restschuld → Netto ${eur(e[k].nettovermoegen)} nach ${inp.horizontJahre} J.</summary>
+      <p class="erklaerung">
+        Monatsrate bleibt konstant bei <strong>${eur(basis.monatsbudget)}</strong> (gleiches Budget wie in Phase 1).
+        Jeder Jahresbetrag von ${eur(budgetJahr)} teilt sich auf in <em>Zinsen</em>, <em>Schuldenabbau</em> und — sobald
+        Budget frei wird — <em>Anlage</em>. ${k === 'etf'
+          ? 'In Phase 2 wird <strong>nicht weiter aktiv in den ETF eingezahlt</strong>; das Depot vom Break-Point wächst weiter und überschüssiges Budget wird angelegt.'
+          : k === 'bauspar'
+          ? 'Zuerst wird die teuerste Schuld getilgt; das günstige Bauspardarlehen bleibt länger stehen.'
+          : 'Die gesamte Rate tilgt die Restschuld, danach fließt das Budget in die Anlage.'}
+      </p>
+      <div class="tabelle-wrap"><table class="tilgungsplan">${kopf}<tbody>${zeilen}</tbody></table></div>
+    </details>`;
   }).join('');
-  $('phase2Tabelle').innerHTML = kopf + `<tbody>${zeilen}</tbody>`;
+
+  $('phase2Tabellen').innerHTML = bloecke;
 }
 
 // ---------------------------------------------------------------------------
@@ -282,18 +325,19 @@ function berechnen() {
 
   const basis = basisRechnung(inp);
   const sz = szenarien(inp, basis);
-  const mc = monteCarlo(inp, Math.max(200, Math.min(50000, parseInt($('mcLaeufe').value, 10) || 3000)), basis);
 
   $('horizontLabel').textContent = inp.horizontJahre;
   rendereKarten(sz);
   rendereTilgungsplan(inp, basis);
-  renderePhase2Tabelle(inp, sz);
-  rendereSzenarioTabelle(sz);
-  rendereEmpfehlung(sz, mc, inp);
-  rendereProContra(sz, mc);
+  rendereUebergang(inp, basis, sz);
+  renderePhase2Tabellen(inp, basis, sz);
+  rendereEmpfehlung(sz, inp);
+  rendereProContra(sz);
   restschuldChart(basis.verlaufBank);
   vergleichChart(sz.erwartet);
-  rendereMonteCarlo(mc);
+  phase2Chart('chartP2Pessimistisch', sz.pessimistisch, inp.zinsbindungJahre);
+  phase2Chart('chartP2Erwartet', sz.erwartet, inp.zinsbindungJahre);
+  phase2Chart('chartP2Optimistisch', sz.optimistisch, inp.zinsbindungJahre);
 
   $('ergebnisse').hidden = false;
   $('ergebnisse').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -312,17 +356,6 @@ function init() {
   for (const k of ['kaufpreis', 'eigenkapital', 'grunderwerbPct', 'notarPct', 'grundbuchPct', 'maklerPct', 'darlehenOverride']) {
     $(k)?.addEventListener('input', () => nebenkostenHinweis(eingabenLesen()));
   }
-
-  // Tabs
-  document.querySelectorAll('.tab').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach((b) => b.classList.remove('aktiv'));
-      btn.classList.add('aktiv');
-      document.querySelectorAll('[data-tabinhalt]').forEach((el) => {
-        el.hidden = el.dataset.tabinhalt !== btn.dataset.tab;
-      });
-    });
-  });
 
   nebenkostenHinweis(eingabenLesen());
   berechnen(); // direkt ein Ergebnis zeigen

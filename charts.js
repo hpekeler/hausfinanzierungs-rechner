@@ -64,6 +64,39 @@ export function vergleichChart(erwartet) {
   });
 }
 
+/**
+ * Phase-2-Verlauf eines Szenarios: Nettovermögen (Anlage − Restschuld) je Jahr
+ * für alle drei Strategien. `ergebnis` = ein Szenario aus szenarien() (z.B. sz.erwartet),
+ * jede Strategie mit `.verlauf` aus phase2(). `zinsbindungJahre` für absolute Jahres-Achse.
+ */
+export function phase2Chart(canvasId, ergebnis, zinsbindungJahre) {
+  const keys = ['basis', 'bauspar', 'etf'];
+  const verlauf = ergebnis.basis.verlauf;
+  const labels = verlauf.map((p) => `${zinsbindungJahre + p.jahr}`);
+  neu(canvasId, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: keys.map((k) => ({
+        label: LABELS[k],
+        data: ergebnis[k].verlauf.map((p) => p.anlage - p.schuld),
+        borderColor: FARBEN[k],
+        backgroundColor: FARBEN[k] + '22',
+        fill: false, tension: .2, pointRadius: 0,
+      })),
+    },
+    options: {
+      ...gemeinsameOptionen,
+      plugins: { legend: { labels: { color: achsenFarbe } } },
+      scales: {
+        ...gemeinsameOptionen.scales,
+        x: { ...gemeinsameOptionen.scales.x, title: { display: true, text: 'Jahr', color: achsenFarbe } },
+        y: { ...gemeinsameOptionen.scales.y, title: { display: true, text: 'Nettovermögen', color: achsenFarbe } },
+      },
+    },
+  });
+}
+
 /** Histogramm der Monte-Carlo-Endwerte (drei Strategien überlagert). */
 export function monteCarloChart(roh) {
   const alle = [...roh.basis, ...roh.bauspar, ...roh.etf];
